@@ -1,11 +1,11 @@
 // app/page.js - 메인 페이지
 "use client";
-import NaverMapDirection from "./components/NaverMapDirection";
+import NaverMapDirection from "@/components/NaverMapDirection";
 
 // 메인 페이지
 function RouteFinder() {
   // 실제 사용 시에는 환경 변수 등으로 관리
-  const NAVER_MAP_API_KEY = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "";
+  const NAVER_MAP_API_KEY = process.env.NEXT_PUBLIC_NAVER_CLIENT_ID || "";
 
   return (
     <div className="container mx-auto p-4">
@@ -32,7 +32,7 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col gap-12 items-center justify-between p-24">
       <h1 className="text-4xl font-bold">Map API Examples</h1>
-      <div className="w-full h-[800px] max-w-4xl overflow-hidden">
+      <div className="w-full max-w-4xl">
         <RouteFinder />
       </div>
     </main>

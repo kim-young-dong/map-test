@@ -2,8 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // 네이버 API 키 정보 (환경 변수에서 로드)
-const NAVER_CLIENT_ID = process.env.NAVER_CLIENT_ID;
-const NAVER_CLIENT_SECRET = process.env.NAVER_CLIENT_SECRET;
+const NAVER_CLIENT_ID = process.env.NAVER_SEARCH_CLIENT_ID;
+const NAVER_CLIENT_SECRET = process.env.NAVER_SEARCH_CLIENT_SECRET;
 
 export async function POST(request: NextRequest) {
   try {

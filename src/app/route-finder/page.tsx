@@ -1,12 +1,10 @@
 // app/route-finder/page.tsx
 "use client";
-
-import { useState } from "react";
-import NaverMapDirection from "../components/NaverMapDirection";
+import NaverMapDirection from "@/components/NaverMapDirection";
 
 export default function RouteFinder() {
   // 실제 사용 시에는 환경 변수 등으로 관리
-  const NAVER_MAP_API_KEY = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "";
+  const NAVER_MAP_API_KEY = process.env.NEXT_PUBLIC_NAVER_CLIENT_ID || "";
 
   return (
     <div className="container mx-auto p-4">
