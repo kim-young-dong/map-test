@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
     const places = data.items.map((item: any) => ({
       name: item.title.replace(/<[^>]*>/g, ""), // HTML 태그 제거
       address: item.roadAddress || item.address,
-      x: item.mapx, // 경도
-      y: item.mapy, // 위도
+      x: item.mapx.toString().replace(/(\d+)(\d{7})$/, "$1.$2"), // 경도
+      y: item.mapy.toString().replace(/(\d+)(\d{7})$/, "$1.$2"), // 위도
     }));
 
     return NextResponse.json({ places });

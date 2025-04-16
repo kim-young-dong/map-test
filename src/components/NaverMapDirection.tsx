@@ -48,6 +48,7 @@ export default function NaverMapDirection({ apiKey }: NaverMapDirectionProps) {
   // 지도 및 마커 관련 refs
   const mapRef = useRef<HTMLDivElement>(null);
   const [isMapLoaded, setIsMapLoaded] = useState<boolean>(false);
+  const [isMapInitialized, setIsMapInitialized] = useState<boolean>(false);
   const mapInstanceRef = useRef<any>(null);
   const routeRef = useRef<any>(null);
   const startMarkerRef = useRef<any>(null);
@@ -57,46 +58,70 @@ export default function NaverMapDirection({ apiKey }: NaverMapDirectionProps) {
 
   // 네이버 맵 스크립트 로드 완료 후 실행되는 함수
   const handleMapLoad = () => {
+    console.log("네이버 지도 스크립트 로드 완료");
     setIsMapLoaded(true);
   };
 
   // 지도 초기화
   useEffect(() => {
-    if (isMapLoaded && mapRef.current) {
-      // 지도 생성 (초기 중심은 서울시청)
-      const mapOptions = {
-        center: new window.naver.maps.LatLng(37.5666805, 126.9784147),
-        zoom: 14,
-        mapTypeControl: true,
-      };
+    if (isMapLoaded && mapRef.current && !isMapInitialized) {
+      console.log("지도 초기화 시작");
+      try {
+        // 지도 생성 (초기 중심은 서울시청)
+        const mapOptions = {
+          center: new window.naver.maps.LatLng(37.5666805, 126.9784147),
+          zoom: 14,
+          mapTypeControl: true,
+        };
 
-      const mapInstance = new window.naver.maps.Map(mapRef.current, mapOptions);
-      mapInstanceRef.current = mapInstance;
+        const mapInstance = new window.naver.maps.Map(
+          mapRef.current,
+          mapOptions
+        );
+        mapInstanceRef.current = mapInstance;
 
-      // 정보창 생성
-      infoWindowRef.current = new window.naver.maps.InfoWindow({
-        content: "",
-        maxWidth: 300,
-        backgroundColor: "#fff",
-        borderColor: "#888",
-        borderWidth: 2,
-        anchorSize: new window.naver.maps.Size(0, 0),
-        pixelOffset: new window.naver.maps.Point(0, -10),
-      });
+        // 정보창 생성
+        infoWindowRef.current = new window.naver.maps.InfoWindow({
+          content: "",
+          maxWidth: 300,
+          backgroundColor: "#fff",
+          borderColor: "#888",
+          borderWidth: 2,
+          anchorSize: new window.naver.maps.Size(0, 0),
+          pixelOffset: new window.naver.maps.Point(0, -10),
+        });
+
+        console.log("지도 초기화 완료");
+        setIsMapInitialized(true);
+      } catch (error) {
+        console.error("지도 초기화 중 오류 발생:", error);
+      }
     }
   }, [isMapLoaded]);
 
   // 출발지/도착지가 모두 설정되면 경로 표시
   useEffect(() => {
-    if (startPoint && endPoint && mapInstanceRef.current) {
+    if (startPoint && endPoint && mapInstanceRef.current && isMapInitialized) {
+      console.log("출발지와 도착지가 모두 설정되어 경로 요청");
       fetchDirections(startPoint, endPoint);
     }
-  }, [startPoint, endPoint]);
+  }, [startPoint, endPoint, isMapInitialized]);
 
   // 키워드 검색 함수
   const searchPlaces = async (keyword: string, mode: "start" | "end") => {
-    if (!keyword.trim() || !isMapLoaded) return;
+    if (!keyword.trim() || !isMapLoaded || !isMapInitialized) {
+      console.log("검색 조건 불충족:", {
+        keyword: !!keyword.trim(),
+        isMapLoaded,
+        isMapInitialized,
+      });
+      return;
+    }
 
+    console.log(
+      `${mode === "start" ? "출발지" : "도착지"} 검색 시작:`,
+      keyword
+    );
     setSearchMode(mode);
 
     try {
@@ -110,6 +135,7 @@ export default function NaverMapDirection({ apiKey }: NaverMapDirectionProps) {
       });
 
       const data = await response.json();
+      console.log("검색 결과:", data);
 
       if (data.places && Array.isArray(data.places)) {
         const places: Place[] = data.places.map((item: any, index: number) => ({
@@ -121,6 +147,8 @@ export default function NaverMapDirection({ apiKey }: NaverMapDirectionProps) {
             lng: parseFloat(item.x),
           },
         }));
+
+        console.log("변환된 장소 데이터:", places);
 
         // 검색 결과 상태 업데이트
         if (mode === "start") {
@@ -139,79 +167,168 @@ export default function NaverMapDirection({ apiKey }: NaverMapDirectionProps) {
 
   // 검색 결과를 지도에 표시하는 함수
   const displaySearchResults = (places: Place[]) => {
+    console.log("검색 결과 지도에 표시:", places.length);
+
     // 이전 검색 마커 제거
     searchMarkersRef.current.forEach((marker) => marker.setMap(null));
     searchMarkersRef.current = [];
 
-    if (!mapInstanceRef.current) return;
+    if (!mapInstanceRef.current) {
+      console.error("지도 인스턴스가 없습니다.");
+      return;
+    }
 
     // 검색 결과 경계 설정
     const bounds = new window.naver.maps.LatLngBounds();
 
     // 검색된 장소마다 마커 생성
     places.forEach((place, index) => {
-      const position = new window.naver.maps.LatLng(
-        place.coordinate.lat,
-        place.coordinate.lng
-      );
+      try {
+        const position = new window.naver.maps.LatLng(
+          place.coordinate.lat,
+          place.coordinate.lng
+        );
 
-      // 마커 생성
-      const marker = new window.naver.maps.Marker({
-        position,
-        map: mapInstanceRef.current,
-        icon: {
-          content: `<div style="background-color:#007BFF;color:white;border-radius:50%;width:24px;height:24px;text-align:center;line-height:24px;">${
-            index + 1
-          }</div>`,
-          anchor: new window.naver.maps.Point(12, 12),
-        },
-      });
+        // 마커 생성
+        const marker = new window.naver.maps.Marker({
+          position,
+          map: mapInstanceRef.current,
+          icon: {
+            content: `<div style="background-color:#007BFF;color:white;border-radius:50%;width:24px;height:24px;text-align:center;line-height:24px;">${
+              index + 1
+            }</div>`,
+            anchor: new window.naver.maps.Point(12, 12),
+          },
+        });
 
-      // 마커 클릭 이벤트
-      window.naver.maps.Event.addListener(marker, "click", () => {
-        // 정보창 내용 설정
-        const content = `
-          <div style="padding:10px;">
-            <h5 style="margin:0 0 5px;font-size:14px;font-weight:bold;">${
-              place.name
-            }</h5>
-            <p style="margin:0;font-size:12px;">${place.address}</p>
-            <div style="margin-top:10px;text-align:center;">
-              <button onclick="window.selectPlace('${
-                place.id
-              }', '${searchMode}')" 
-                      style="padding:5px 10px;background:#2DB400;color:white;border:none;border-radius:3px;cursor:pointer;">
-                ${searchMode === "start" ? "출발지로 선택" : "도착지로 선택"}
-              </button>
+        // 마커 클릭 이벤트
+        window.naver.maps.Event.addListener(marker, "click", () => {
+          console.log("마커 클릭:", place.name);
+          // 정보창 내용 설정
+          const content = `
+            <div style="padding:10px;">
+              <h5 style="margin:0 0 5px;font-size:14px;font-weight:bold;">${
+                place.name
+              }</h5>
+              <p style="margin:0;font-size:12px;">${place.address}</p>
+              <div style="margin-top:10px;text-align:center;">
+                <button id="select-place-btn" 
+                        style="padding:5px 10px;background:#2DB400;color:white;border:none;border-radius:3px;cursor:pointer;">
+                  ${searchMode === "start" ? "출발지로 선택" : "도착지로 선택"}
+                </button>
+              </div>
             </div>
-          </div>
-        `;
+          `;
 
-        infoWindowRef.current.setContent(content);
-        infoWindowRef.current.open(mapInstanceRef.current, marker);
-      });
+          infoWindowRef.current.setContent(content);
+          infoWindowRef.current.open(mapInstanceRef.current, marker);
 
-      // 검색 마커 배열에 추가
-      searchMarkersRef.current.push(marker);
+          // 정보창이 열린 후 버튼에 이벤트 리스너 추가
+          setTimeout(() => {
+            const selectBtn = document.getElementById("select-place-btn");
+            if (selectBtn) {
+              selectBtn.addEventListener("click", () => {
+                selectPlace(place, searchMode || "start");
+              });
+            }
+          }, 100);
+        });
 
-      // 지도 경계에 포함
-      bounds.extend(position);
+        // 검색 마커 배열에 추가
+        searchMarkersRef.current.push(marker);
+
+        // 지도 경계에 포함
+        bounds.extend(position);
+      } catch (error) {
+        console.error("마커 생성 중 오류:", error);
+      }
     });
 
     // 모든 검색 결과가 보이도록 지도 이동 및 확대/축소
     if (places.length > 0) {
-      mapInstanceRef.current.fitBounds(bounds, {
-        top: 50,
-        right: 50,
-        bottom: 50,
-        left: 50,
-      });
+      try {
+        mapInstanceRef.current.fitBounds(bounds, {
+          top: 50,
+          right: 50,
+          bottom: 50,
+          left: 50,
+        });
+      } catch (error) {
+        console.error("지도 범위 조정 중 오류:", error);
+      }
     }
+  };
+
+  // 장소 선택 함수
+  const selectPlace = (place: Place, mode: "start" | "end") => {
+    console.log(`${mode === "start" ? "출발지" : "도착지"} 선택:`, place.name);
+
+    if (!mapInstanceRef.current) {
+      console.error("지도 인스턴스가 없습니다.");
+      return;
+    }
+
+    // 정보창 닫기
+    infoWindowRef.current.close();
+
+    // 선택한 위치 저장
+    const coordinate = place.coordinate;
+
+    if (mode === "start") {
+      setStartPoint(coordinate);
+
+      // 기존 출발지 마커 제거
+      if (startMarkerRef.current) {
+        startMarkerRef.current.setMap(null);
+      }
+
+      // 새 출발지 마커 생성
+      const marker = new window.naver.maps.Marker({
+        position: new window.naver.maps.LatLng(coordinate.lat, coordinate.lng),
+        map: mapInstanceRef.current,
+        icon: {
+          content:
+            '<div style="background-color:#4CAF50;color:white;border-radius:50%;width:28px;height:28px;text-align:center;line-height:28px;font-weight:bold;">출발</div>',
+          anchor: new window.naver.maps.Point(14, 14),
+        },
+      });
+
+      startMarkerRef.current = marker;
+    } else {
+      setEndPoint(coordinate);
+
+      // 기존 도착지 마커 제거
+      if (endMarkerRef.current) {
+        endMarkerRef.current.setMap(null);
+      }
+
+      // 새 도착지 마커 생성
+      const marker = new window.naver.maps.Marker({
+        position: new window.naver.maps.LatLng(coordinate.lat, coordinate.lng),
+        map: mapInstanceRef.current,
+        icon: {
+          content:
+            '<div style="background-color:#FF5722;color:white;border-radius:50%;width:28px;height:28px;text-align:center;line-height:28px;font-weight:bold;">도착</div>',
+          anchor: new window.naver.maps.Point(14, 14),
+        },
+      });
+
+      endMarkerRef.current = marker;
+    }
+
+    // 검색 마커 제거
+    searchMarkersRef.current.forEach((marker) => marker.setMap(null));
+    searchMarkersRef.current = [];
+
+    // 검색 모드 초기화
+    setSearchMode(null);
   };
 
   // 경로 API를 통해 경로 데이터 가져오기
   const fetchDirections = async (start: Coordinate, end: Coordinate) => {
     try {
+      console.log("경로 데이터 요청 시작:", { start, end });
+
       // 백엔드 API를 통해 네이버 Direction API 호출
       const response = await fetch("/api/directions", {
         method: "POST",
@@ -226,6 +343,7 @@ export default function NaverMapDirection({ apiKey }: NaverMapDirectionProps) {
       });
 
       const data = await response.json();
+      console.log("경로 데이터 응답:", data);
 
       if (data.route && data.route.trafast && data.route.trafast[0]) {
         // 이전에 그려진 경로가 있다면 제거
@@ -238,6 +356,8 @@ export default function NaverMapDirection({ apiKey }: NaverMapDirectionProps) {
           (point: [number, number]) =>
             new window.naver.maps.LatLng(point[1], point[0])
         );
+
+        console.log("경로 좌표 추출 완료, 좌표 수:", path.length);
 
         // Polyline으로 경로 그리기
         const polyline = new window.naver.maps.Polyline({
@@ -266,102 +386,15 @@ export default function NaverMapDirection({ apiKey }: NaverMapDirectionProps) {
           bottom: 100,
           left: 100,
         });
+
+        console.log("경로 표시 완료");
+      } else {
+        console.error("올바른 경로 데이터가 없습니다:", data);
       }
     } catch (error) {
       console.error("경로 데이터를 가져오는 중 오류가 발생했습니다:", error);
     }
   };
-
-  // 장소 선택 함수 (window 객체에 함수 노출)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // @ts-ignore
-      window.selectPlace = (placeId: string, mode: "start" | "end") => {
-        let selectedPlace: Place | undefined;
-
-        if (mode === "start") {
-          selectedPlace = startSearchResults.find(
-            (place) => place.id === placeId
-          );
-        } else {
-          selectedPlace = endSearchResults.find(
-            (place) => place.id === placeId
-          );
-        }
-
-        if (!selectedPlace || !mapInstanceRef.current) return;
-
-        // 정보창 닫기
-        infoWindowRef.current.close();
-
-        // 선택한 위치 저장
-        const coordinate = selectedPlace.coordinate;
-
-        if (mode === "start") {
-          setStartPoint(coordinate);
-
-          // 기존 출발지 마커 제거
-          if (startMarkerRef.current) {
-            startMarkerRef.current.setMap(null);
-          }
-
-          // 새 출발지 마커 생성
-          const marker = new window.naver.maps.Marker({
-            position: new window.naver.maps.LatLng(
-              coordinate.lat,
-              coordinate.lng
-            ),
-            map: mapInstanceRef.current,
-            icon: {
-              content:
-                '<div style="background-color:#4CAF50;color:white;border-radius:50%;width:28px;height:28px;text-align:center;line-height:28px;font-weight:bold;">출발</div>',
-              anchor: new window.naver.maps.Point(14, 14),
-            },
-          });
-
-          startMarkerRef.current = marker;
-        } else {
-          setEndPoint(coordinate);
-
-          // 기존 도착지 마커 제거
-          if (endMarkerRef.current) {
-            endMarkerRef.current.setMap(null);
-          }
-
-          // 새 도착지 마커 생성
-          const marker = new window.naver.maps.Marker({
-            position: new window.naver.maps.LatLng(
-              coordinate.lat,
-              coordinate.lng
-            ),
-            map: mapInstanceRef.current,
-            icon: {
-              content:
-                '<div style="background-color:#FF5722;color:white;border-radius:50%;width:28px;height:28px;text-align:center;line-height:28px;font-weight:bold;">도착</div>',
-              anchor: new window.naver.maps.Point(14, 14),
-            },
-          });
-
-          endMarkerRef.current = marker;
-        }
-
-        // 검색 마커 제거
-        searchMarkersRef.current.forEach((marker) => marker.setMap(null));
-        searchMarkersRef.current = [];
-
-        // 검색 모드 초기화
-        setSearchMode(null);
-      };
-    }
-
-    // 컴포넌트 언마운트 시 전역 함수 제거
-    return () => {
-      if (typeof window !== "undefined") {
-        // @ts-ignore
-        delete window.selectPlace;
-      }
-    };
-  }, [startSearchResults, endSearchResults]);
 
   return (
     <>
@@ -381,6 +414,9 @@ export default function NaverMapDirection({ apiKey }: NaverMapDirectionProps) {
               onChange={(e) => setStartKeyword(e.target.value)}
               placeholder="출발지 검색"
               className="flex-1 p-2 border border-gray-300 rounded-l"
+              onKeyPress={(e) => {
+                if (e.key === "Enter") searchPlaces(startKeyword, "start");
+              }}
             />
             <button
               onClick={() => searchPlaces(startKeyword, "start")}
@@ -406,6 +442,9 @@ export default function NaverMapDirection({ apiKey }: NaverMapDirectionProps) {
               onChange={(e) => setEndKeyword(e.target.value)}
               placeholder="도착지 검색"
               className="flex-1 p-2 border border-gray-300 rounded-l"
+              onKeyPress={(e) => {
+                if (e.key === "Enter") searchPlaces(endKeyword, "end");
+              }}
             />
             <button
               onClick={() => searchPlaces(endKeyword, "end")}
@@ -442,10 +481,7 @@ export default function NaverMapDirection({ apiKey }: NaverMapDirectionProps) {
                 <li
                   key={place.id}
                   className="p-3 border-b hover:bg-gray-50 cursor-pointer"
-                  onClick={() => {
-                    // @ts-ignore
-                    window.selectPlace(place.id, searchMode);
-                  }}
+                  onClick={() => selectPlace(place, searchMode)}
                 >
                   <h4 className="font-medium">{place.name}</h4>
                   <p className="text-sm text-gray-600">{place.address}</p>
